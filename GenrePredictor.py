@@ -15,11 +15,19 @@ class GenrePredictor:
         # Load the ML model
         self.model = models.load_model('cmodel.62-0.6394.h5')
 
-    def load_audio(path):
+        scaler = None
+        with open('scaler.o', 'rb') as f:
+            scaler = pickle.load(f)
+
+        self.scaler = scaler
+
+        self.GENRES = ['blues', 'classical', 'country', 'disco', 'hiphop', 'jazz', 'metal', 'pop', 'reggae', 'rock']
+
+    def load_audio(self, path):
         y, sr = librosa.load(path, mono=True, duration=3)
         return y, sr
 
-    def extract_features(y, sr):
+    def extract_features(self, y, sr):
         features = []
         chroma_stft = librosa.feature.chroma_stft(y=y, sr=sr)
         rmse = librosa.feature.rms(y=y)
@@ -31,25 +39,18 @@ class GenrePredictor:
         features.append([np.mean(chroma_stft), np.mean(rmse), np.mean(spec_cent), np.mean(spec_bw), np.mean(rolloff), np.mean(zcr)]+[np.mean(mfcc[i]) for i in range(len(mfcc))])
         return np.array(features)
 
-    scaler = None
-
-    with open('scaler.o', 'rb') as f:
-        scaler = pickle.load(f)
-
-    GENRES = ['blues', 'classical', 'country', 'disco', 'hiphop', 'jazz', 'metal', 'pop', 'reggae', 'rock']
-
-    def predict_genre(path):
+    def predict_genre(self, path):
         print("Loading audio")
-        audio, sr = load_audio(path)
+        audio, sr = self.load_audio(path)
         print("Getting features")
-        features = extract_features(audio, sr)
-        X = scaler.transform(np.array(features, dtype = float))
+        features = self.extract_features(audio, sr)
+        X = self.scaler.transform(np.array(features, dtype = float))
         print("Predicting...")
-        predictions = model.predict(X)
+        predictions = self.model.predict(X)
 
         prediction_object = []
         for i, prediction in enumerate(predictions[0]):
-            prediction_object.append({"genre":GENRES[i], "certainty": float(f'{prediction:.2f}')})
+            prediction_object.append({"genre":self.GENRES[i], "certainty": float(f'{prediction:.2f}')})
         return prediction_object
 
 #genre = predict_genre("./blues_99-5.wav")
